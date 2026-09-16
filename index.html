@@ -59,7 +59,6 @@
             cursor: pointer;
         }
 
-        /* Карточка события прямо в ячейке месяца с поддержкой перетаскивания */
         .month-event-card {
             background-color: var(--button-color);
             color: var(--button-text-color);
@@ -117,7 +116,7 @@
             background-color: var(--button-color);
             color: var(--button-text-color);
             border-radius: 6px;
-            padding: 4px 8px;
+            padding: 6px 8px;
             font-size: 13px;
             display: flex;
             flex-direction: column;
@@ -127,7 +126,7 @@
         }
 
         .resize-handle {
-            height: 12px;
+            height: 16px;
             width: 100%;
             position: absolute;
             bottom: 0;
@@ -141,8 +140,8 @@
         .resize-handle::after {
             content: '';
             width: 30px;
-            height: 3px;
-            background-color: rgba(255, 255, 255, 0.6);
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.7);
             border-radius: 2px;
         }
 
@@ -212,9 +211,7 @@
                     eventCard.className = 'month-event-card';
                     eventCard.textContent = appData[dateKey].note;
                     
-                    // Логика перетаскивания события между днями (как в пятнашках)
                     initMonthDrag(eventCard, dateKey);
-                    
                     cell.appendChild(eventCard);
                 }
 
@@ -255,14 +252,13 @@
                     window.removeEventListener('pointerup', onPointerUp);
                     clone.remove();
 
-                    // Ищем, над какой ячейкой дня отпустили карточку
                     let elemBelow = document.elementFromPoint(e.clientX, e.clientY);
                     let targetCell = elemBelow ? elemBelow.closest('.day-cell') : null;
 
                     if (targetCell) {
                         let targetDateKey = targetCell.dataset.date;
                         if (targetDateKey && targetDateKey !== sourceDateKey) {
-                            // Переносим данные на новую дату
+                            // Переносим объект со всеми его временными параметрами на новый день
                             appData[targetDateKey] = appData[sourceDateKey];
                             delete appData[sourceDateKey];
 
@@ -318,7 +314,6 @@
             }
         }
 
-        // Драг-н-ресайз внутри подробного дня (изменение длительности за нижний маркер)
         function createDayResizeCard(startHour, duration, note) {
             let card = document.createElement('div');
             card.className = 'booking-card';
@@ -358,7 +353,9 @@
                     window.removeEventListener('pointerup', onPointerUp);
 
                     let finalDuration = Math.round(card.offsetHeight / rowHeight);
-                    appData[currentSelectedDate].durationHours = finalDuration;
+                    if (appData[currentSelectedDate]) {
+                        appData[currentSelectedDate].durationHours = finalDuration;
+                    }
                     
                     if (tg.HapticFeedback) {
                         tg.HapticFeedback.impactOccurred('medium');
