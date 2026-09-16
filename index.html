@@ -2,140 +2,322 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Пятнашки (Свайпы)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Календарь автосервиса</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --button-color: var(--tg-theme-button-color, #2481cc);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --card-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--tg-theme-bg-color, #121212);
-            color: var(--tg-theme-text-color, #ffffff);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Сетка месяца */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .day-cell {
+            background-color: var(--card-bg);
+            aspect-ratio: 1;
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
-            user-select: none;
-            touch-action: none; /* Отключаем стандартные свайпы браузера */
+            font-size: 16px;
+            font-weight: 500;
+            position: relative;
+            cursor: pointer;
         }
-        h2 { margin-bottom: 10px; font-size: 20px; }
-        .board {
-            display: grid;
-            grid-template-columns: repeat(4, 75px);
-            grid-template-rows: repeat(4, 75px);
-            gap: 6px;
-            background: var(--tg-theme-secondary-bg-color, #222);
-            padding: 10px;
-            border-radius: 12px;
+
+        .day-cell .note {
+            font-size: 10px;
+            color: var(--button-color);
+            margin-top: 4px;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        .tile {
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            font-size: 24px;
-            font-weight: bold;
+
+        /* 24 часа */
+        .hours-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 75vh;
+            overflow-y: auto;
+            position: relative;
+            padding-bottom: 40px;
+        }
+
+        .hour-row {
+            display: flex;
+            align-items: center;
+            height: 40px;
+            border-bottom: 1px solid var(--card-bg);
+            font-size: 14px;
+        }
+
+        .hour-label {
+            width: 60px;
+            color: var(--hint-color);
+            font-size: 12px;
+        }
+
+        .hour-slot {
+            flex: 1;
+            height: 36px;
+            background-color: transparent;
+            border-radius: 4px;
+        }
+
+        /* Карточка бронирования с возможностью растягивания */
+        .booking-card {
+            position: absolute;
+            left: 65px;
+            right: 10px;
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        .resize-handle {
+            height: 12px;
+            width: 100%;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            cursor: ns-resize;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
         }
-        .tile.empty {
-            background: transparent;
+
+        .resize-handle::after {
+            content: '';
+            width: 30px;
+            height: 3px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 2px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--button-color);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 12px;
+            padding: 0;
         }
     </style>
 </head>
 <body>
-    <h2>Пятнашки (Свайпы)</h2>
-    <div class="board" id="board"></div>
+
+    <!-- ВЬЮ 1: МЕСЯЦ -->
+    <div id="monthView" class="view active">
+        <h2>Сентябрь 2026</h2>
+        <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+
+    <!-- ВЬЮ 2: 24 ЧАСА ДНЯ -->
+    <div id="dayView" class="view">
+        <button class="back-btn" id="backBtn">← Назад к месяцу</button>
+        <h2 id="selectedDateTitle">День</h2>
+        <div class="hours-container" id="hoursContainer"></div>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-
-        let tiles = [...Array(15).keys()].map(x => x + 1);
-        tiles.push(null);
-
-        function shuffle() {
-            for (let i = tiles.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
-            }
-        }
-        shuffle();
-
-        function render() {
-            const board = document.getElementById('board');
-            board.innerHTML = '';
-            tiles.forEach((tile, index) => {
-                const el = document.createElement('div');
-                el.className = 'tile' + (tile === null ? ' empty' : '');
-                el.textContent = tile !== null ? tile : '';
-                board.appendChild(el);
-            });
+        if (tg.disableVerticalSwipes) {
+            tg.disableVerticalSwipes();
         }
 
-        let startX = 0;
-        let startY = 0;
+        // Данные (в реальном проекте приходят с бэкенда Python)
+        let appData = {
+            "2026-09-15": { note: "ТО", startHour: 10, durationHours: 2 },
+            "2026-09-18": { note: "Ремонт", startHour: 13, durationHours: 4 }
+        };
 
-        window.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1) {
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-            }
-        }, { passive: false });
+        let currentSelectedDate = null;
+        const rowHeight = 44; // высота часа в пикселях с отступом
 
-        window.addEventListener('touchend', (e) => {
-            if (!startX || !startY) return;
+        const calendarGrid = document.getElementById('calendarGrid');
+        const monthView = document.getElementById('monthView');
+        const dayView = document.getElementById('dayView');
+        const hoursContainer = document.getElementById('hoursContainer');
+        const selectedDateTitle = document.getElementById('selectedDateTitle');
+        const backBtn = document.getElementById('backBtn');
 
-            let endX = e.changedTouches[0].clientX;
-            let endY = e.changedTouches[0].clientY;
+        // Рендер месяца (дни с 1 по 30)
+        function renderMonth() {
+            calendarGrid.innerHTML = '';
+            for (let i = 1; i <= 30; i++) {
+                let dayStr = i < 10 ? `0${i}` : `${i}`;
+                let dateKey = `2026-09-${dayStr}`;
 
-            let diffX = endX - startX;
-            let diffY = endY - startY;
+                let cell = document.createElement('div');
+                cell.className = 'day-cell';
+                
+                let dayNum = document.createElement('span');
+                dayNum.textContent = i;
+                cell.appendChild(dayNum);
 
-            let threshold = 30; // Минимальная длина свайпа в пикселях
-
-            if (Math.abs(diffX) > Math.abs(diffY)) {
-                if (Math.abs(diffX) > threshold) {
-                    if (diffX > 0) moveDirection('right');
-                    else moveDirection('left');
+                if (appData[dateKey]) {
+                    let noteSpan = document.createElement('span');
+                    noteSpan.className = 'note';
+                    noteSpan.textContent = appData[dateKey].note;
+                    cell.appendChild(noteSpan);
                 }
+
+                cell.addEventListener('click', () => {
+                    openDayView(dateKey);
+                });
+
+                calendarGrid.appendChild(cell);
+            }
+        }
+
+        // Открыть сетку 24 часа
+        function openDayView(dateKey) {
+            currentSelectedDate = dateKey;
+            selectedDateTitle.textContent = `Дата: ${dateKey}`;
+            monthView.classList.remove('active');
+            dayView.classList.add('active');
+            renderHours();
+        }
+
+        backBtn.addEventListener('click', () => {
+            dayView.classList.remove('active');
+            monthView.classList.add('active');
+            renderMonth();
+        });
+
+        // Рендер 24 часов и карточки с возможностью драг-н-дропа (растягивания)
+        function renderHours() {
+            hoursContainer.innerHTML = '';
+            
+            // Строим шкалу времени
+            for (let h = 0; h < 24; h++) {
+                let hourRow = document.createElement('div');
+                hourRow.className = 'hour-row';
+
+                let label = document.createElement('div');
+                label.className = 'hour-label';
+                label.textContent = `${h < 10 ? '0' + h : h}:00`;
+
+                let slot = document.createElement('div');
+                slot.className = 'hour-slot';
+                slot.dataset.hour = h;
+
+                hourRow.appendChild(label);
+                hourRow.appendChild(slot);
+                hoursContainer.appendChild(hourRow);
+            }
+
+            let dayData = appData[currentSelectedDate];
+            if (dayData) {
+                createBookingCard(dayData.startHour, dayData.durationHours, dayData.note);
             } else {
-                if (Math.abs(diffY) > threshold) {
-                    if (diffY > 0) moveDirection('down');
-                    else moveDirection('up');
-                }
-            }
-
-            startX = 0;
-            startY = 0;
-        }, { passive: false });
-
-        function moveDirection(dir) {
-            const emptyIndex = tiles.indexOf(null);
-            const row = Math.floor(emptyIndex / 4);
-            const col = emptyIndex % 4;
-
-            let targetIndex = -1;
-
-            // Свайп влево двигает фишку справа на место пустой
-            if (dir === 'left' && col < 3) targetIndex = emptyIndex + 1;
-            // Свайп вправо двигает фишку слева
-            else if (dir === 'right' && col > 0) targetIndex = emptyIndex - 1;
-            // Свайп вверх двигает фишку снизу
-            else if (dir === 'up' && row < 3) targetIndex = emptyIndex + 4;
-            // Свайп вниз двигает фишку сверху
-            else if (dir === 'down' && row > 0) targetIndex = emptyIndex - 4;
-
-            if (targetIndex !== -1) {
-                tiles[emptyIndex] = tiles[targetIndex];
-                tiles[targetIndex] = null;
-                tg.HapticFeedback.impactOccurred('light');
-                render();
+                // Если записи нет, создадим дефолтную по клику на ячейку или создадим пустую для теста
             }
         }
 
-        render();
+        function createBookingCard(startHour, duration, note) {
+            let card = document.createElement('div');
+            card.className = 'booking-card';
+            card.style.top = `${startHour * rowHeight + 4}px`;
+            card.style.height = `${duration * rowHeight - 6}px`;
+            card.innerHTML = `<span><b>${note}</b> (${duration} ч.)</span><div class="resize-handle" id="resizeHandle"></div>`;
+
+            hoursContainer.appendChild(card);
+
+            let handle = card.querySelector('#resizeHandle');
+            let startY = 0;
+            let initialHeight = 0;
+
+            handle.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                startY = e.clientY;
+                initialHeight = card.offsetHeight;
+
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', onPointerUp);
+            });
+
+            function onPointerMove(e) {
+                let deltaY = e.clientY - startY;
+                let newHeight = initialHeight + deltaY;
+                
+                // Ограничения минимальной и максимальной длительности
+                let minH = rowHeight - 6;
+                let maxH = (24 - startHour) * rowHeight;
+                
+                if (newHeight < minH) newHeight = minH;
+                if (newHeight > maxH) newHeight = maxH;
+
+                card.style.height = `${newHeight}px`;
+
+                // Динамический расчет часов на лету
+                let currentDuration = Math.round(newHeight / rowHeight);
+                card.querySelector('span').innerHTML = `<b>${note}</b> (${currentDuration} ч.)`;
+            }
+
+            function onPointerUp(e) {
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', onPointerUp);
+
+                // Фиксация новой длительности в объекте и отправка на Python-сервер
+                let finalDuration = Math.round(card.offsetHeight / rowHeight);
+                appData[currentSelectedDate].durationHours = finalDuration;
+                
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('medium');
+                }
+            }
+        }
+
+        renderMonth();
     </script>
 </body>
 </html>
