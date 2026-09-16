@@ -215,10 +215,9 @@
                     cell.appendChild(eventCard);
                 }
 
-                cell.addEventListener('click', (e) => {
-                    if (e.target === cell || e.target === dayNum) {
-                        openDayView(dateKey);
-                    }
+                // Клик по ячейке открывает суточный вид (даже если кликнули по карточке события, но не тащили её)
+                cell.addEventListener('click', () => {
+                    openDayView(dateKey);
                 });
 
                 calendarGrid.appendChild(cell);
@@ -226,9 +225,15 @@
         }
 
         function initMonthDrag(card, sourceDateKey) {
+            let isDragging = false;
+
             card.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
+                isDragging = false;
                 
+                let startX = e.clientX;
+                let startY = e.clientY;
+
                 let clone = card.cloneNode(true);
                 clone.style.position = 'fixed';
                 clone.style.zIndex = 1000;
@@ -244,6 +249,10 @@
                 moveAt(e.pageX, e.pageY);
 
                 function onPointerMove(e) {
+                    // Если сместили палец больше чем на 5 пикселей — считаем это перетаскиванием
+                    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
+                        isDragging = true;
+                    }
                     moveAt(e.pageX, e.pageY);
                 }
 
@@ -252,21 +261,25 @@
                     window.removeEventListener('pointerup', onPointerUp);
                     clone.remove();
 
-                    let elemBelow = document.elementFromPoint(e.clientX, e.clientY);
-                    let targetCell = elemBelow ? elemBelow.closest('.day-cell') : null;
+                    if (isDragging) {
+                        let elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                        let targetCell = elemBelow ? elemBelow.closest('.day-cell') : null;
 
-                    if (targetCell) {
-                        let targetDateKey = targetCell.dataset.date;
-                        if (targetDateKey && targetDateKey !== sourceDateKey) {
-                            // Переносим объект со всеми его временными параметрами на новый день
-                            appData[targetDateKey] = appData[sourceDateKey];
-                            delete appData[sourceDateKey];
+                        if (targetCell) {
+                            let targetDateKey = targetCell.dataset.date;
+                            if (targetDateKey && targetDateKey !== sourceDateKey) {
+                                appData[targetDateKey] = appData[sourceDateKey];
+                                delete appData[sourceDateKey];
 
-                            if (tg.HapticFeedback) {
-                                tg.HapticFeedback.impactOccurred('medium');
+                                if (tg.HapticFeedback) {
+                                    tg.HapticFeedback.impactOccurred('medium');
+                                }
+                                renderMonth();
                             }
-                            renderMonth();
                         }
+                    } else {
+                        // Если не тащили, а просто тапнули — открываем день
+                        openDayView(sourceDateKey);
                     }
                 }
 
