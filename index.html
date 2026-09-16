@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Пятнашки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--tg-theme-bg-color, #121212);
+            color: var(--tg-theme-text-color, #ffffff);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        h2 { margin-bottom: 10px; font-size: 20px; }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 75px);
+            grid-template-rows: repeat(4, 75px);
+            gap: 6px;
+            background: var(--tg-theme-secondary-bg-color, #222);
+            padding: 10px;
+            border-radius: 12px;
+        }
+        .tile {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .tile.empty {
+            background: transparent;
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+    <h2>Пятнашки</h2>
+    <div class="board" id="board"></div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let tiles = [...Array(15).keys()].map(x => x + 1);
+        tiles.push(null); // пустая ячейка
+
+        // Перемешиваем фишки
+        function shuffle() {
+            for (let i = tiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+            }
+        }
+        shuffle();
+
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            tiles.forEach((tile, index) => {
+                const el = document.createElement('div');
+                el.className = 'tile' + (tile === null ? ' empty' : '');
+                el.textContent = tile !== null ? tile : '';
+                el.onclick = () => move(index);
+                board.appendChild(el);
+            });
+        }
+
+        function move(index) {
+            const emptyIndex = tiles.indexOf(null);
+            const row = Math.floor(index / 4);
+            const col = index % 4;
+            const emptyRow = Math.floor(emptyIndex / 4);
+            const emptyCol = emptyIndex % 4;
+
+            // Проверяем, рядом ли пустая ячейка
+            const isNeighbor = (Math.abs(row - emptyRow) + Math.abs(col - emptyCol)) === 1;
+            if (isNeighbor) {
+                tiles[emptyIndex] = tiles[index];
+                tiles[index] = null;
+                tg.HapticFeedback.impactOccurred('light');
+                render();
+            }
+        }
+
+        render();
+    </script>
+</body>
+</html>
