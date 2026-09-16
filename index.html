@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Пятнашки</title>
+    <title>Пятнашки (Свайпы)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
@@ -17,6 +17,7 @@
             height: 100vh;
             margin: 0;
             user-select: none;
+            touch-action: none; /* Отключаем стандартные свайпы браузера */
         }
         h2 { margin-bottom: 10px; font-size: 20px; }
         .board {
@@ -37,16 +38,14 @@
             align-items: center;
             justify-content: center;
             border-radius: 8px;
-            cursor: pointer;
         }
         .tile.empty {
             background: transparent;
-            cursor: default;
         }
     </style>
 </head>
 <body>
-    <h2>Пятнашки</h2>
+    <h2>Пятнашки (Свайпы)</h2>
     <div class="board" id="board"></div>
 
     <script>
@@ -54,9 +53,8 @@
         tg.expand();
 
         let tiles = [...Array(15).keys()].map(x => x + 1);
-        tiles.push(null); // пустая ячейка
+        tiles.push(null);
 
-        // Перемешиваем фишки
         function shuffle() {
             for (let i = tiles.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -72,23 +70,66 @@
                 const el = document.createElement('div');
                 el.className = 'tile' + (tile === null ? ' empty' : '');
                 el.textContent = tile !== null ? tile : '';
-                el.onclick = () => move(index);
                 board.appendChild(el);
             });
         }
 
-        function move(index) {
-            const emptyIndex = tiles.indexOf(null);
-            const row = Math.floor(index / 4);
-            const col = index % 4;
-            const emptyRow = Math.floor(emptyIndex / 4);
-            const emptyCol = emptyIndex % 4;
+        let startX = 0;
+        let startY = 0;
 
-            // Проверяем, рядом ли пустая ячейка
-            const isNeighbor = (Math.abs(row - emptyRow) + Math.abs(col - emptyCol)) === 1;
-            if (isNeighbor) {
-                tiles[emptyIndex] = tiles[index];
-                tiles[index] = null;
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            if (!startX || !startY) return;
+
+            let endX = e.changedTouches[0].clientX;
+            let endY = e.changedTouches[0].clientY;
+
+            let diffX = endX - startX;
+            let diffY = endY - startY;
+
+            let threshold = 30; // Минимальная длина свайпа в пикселях
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > threshold) {
+                    if (diffX > 0) moveDirection('right');
+                    else moveDirection('left');
+                }
+            } else {
+                if (Math.abs(diffY) > threshold) {
+                    if (diffY > 0) moveDirection('down');
+                    else moveDirection('up');
+                }
+            }
+
+            startX = 0;
+            startY = 0;
+        }, { passive: false });
+
+        function moveDirection(dir) {
+            const emptyIndex = tiles.indexOf(null);
+            const row = Math.floor(emptyIndex / 4);
+            const col = emptyIndex % 4;
+
+            let targetIndex = -1;
+
+            // Свайп влево двигает фишку справа на место пустой
+            if (dir === 'left' && col < 3) targetIndex = emptyIndex + 1;
+            // Свайп вправо двигает фишку слева
+            else if (dir === 'right' && col > 0) targetIndex = emptyIndex - 1;
+            // Свайп вверх двигает фишку снизу
+            else if (dir === 'up' && row < 3) targetIndex = emptyIndex + 4;
+            // Свайп вниз двигает фишку сверху
+            else if (dir === 'down' && row > 0) targetIndex = emptyIndex - 4;
+
+            if (targetIndex !== -1) {
+                tiles[emptyIndex] = tiles[targetIndex];
+                tiles[targetIndex] = null;
                 tg.HapticFeedback.impactOccurred('light');
                 render();
             }
