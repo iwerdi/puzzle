@@ -13,6 +13,7 @@
             --button-color: var(--tg-theme-button-color, #2481cc);
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
             --card-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            --disabled-color: rgba(0, 0, 0, 0.05);
         }
 
         body {
@@ -201,6 +202,7 @@
                 let cell = document.createElement('div');
                 cell.className = 'day-cell';
                 cell.dataset.date = dateKey;
+                cell.dataset.dayNum = i;
                 
                 let dayNum = document.createElement('span');
                 dayNum.textContent = i;
@@ -211,11 +213,10 @@
                     eventCard.className = 'month-event-card';
                     eventCard.textContent = appData[dateKey].note;
                     
-                    initMonthDrag(eventCard, dateKey);
+                    initMonthDrag(eventCard, dateKey, i);
                     cell.appendChild(eventCard);
                 }
 
-                // Клик по ячейке открывает суточный вид (даже если кликнули по карточке события, но не тащили её)
                 cell.addEventListener('click', () => {
                     openDayView(dateKey);
                 });
@@ -224,7 +225,7 @@
             }
         }
 
-        function initMonthDrag(card, sourceDateKey) {
+        function initMonthDrag(card, sourceDateKey, sourceDayNum) {
             let isDragging = false;
 
             card.addEventListener('pointerdown', (e) => {
@@ -249,7 +250,6 @@
                 moveAt(e.pageX, e.pageY);
 
                 function onPointerMove(e) {
-                    // Если сместили палец больше чем на 5 пикселей — считаем это перетаскиванием
                     if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
                         isDragging = true;
                     }
@@ -267,7 +267,10 @@
 
                         if (targetCell) {
                             let targetDateKey = targetCell.dataset.date;
-                            if (targetDateKey && targetDateKey !== sourceDateKey) {
+                            let targetDayNum = parseInt(targetCell.dataset.dayNum);
+
+                            // Запрещаем переносить на ту же дату, а также на более ранние дни
+                            if (targetDateKey && targetDateKey !== sourceDateKey && targetDayNum >= sourceDayNum) {
                                 appData[targetDateKey] = appData[sourceDateKey];
                                 delete appData[sourceDateKey];
 
@@ -275,10 +278,14 @@
                                     tg.HapticFeedback.impactOccurred('medium');
                                 }
                                 renderMonth();
+                            } else if (targetDayNum < sourceDayNum) {
+                                // Опциональная легкая вибрация при ошибке/невозможности переноса
+                                if (tg.HapticFeedback) {
+                                    tg.HapticFeedback.notificationOccurred('error');
+                                }
                             }
                         }
                     } else {
-                        // Если не тащили, а просто тапнули — открываем день
                         openDayView(sourceDateKey);
                     }
                 }
