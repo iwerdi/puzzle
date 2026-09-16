@@ -39,7 +39,6 @@
             display: block;
         }
 
-        /* Сетка месяца */
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -60,17 +59,26 @@
             cursor: pointer;
         }
 
-        .day-cell .note {
+        /* Карточка события прямо в ячейке месяца с поддержкой перетаскивания */
+        .month-event-card {
+            background-color: var(--button-color);
+            color: var(--button-text-color);
             font-size: 10px;
-            color: var(--button-color);
+            padding: 2px 4px;
+            border-radius: 4px;
             margin-top: 4px;
             max-width: 90%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            cursor: grab;
+            touch-action: none;
         }
 
-        /* 24 часа */
+        .month-event-card:active {
+            cursor: grabbing;
+        }
+
         .hours-container {
             display: flex;
             flex-direction: column;
@@ -102,7 +110,6 @@
             border-radius: 4px;
         }
 
-        /* Карточка бронирования с возможностью растягивания */
         .booking-card {
             position: absolute;
             left: 65px;
@@ -153,13 +160,11 @@
 </head>
 <body>
 
-    <!-- ВЬЮ 1: МЕСЯЦ -->
     <div id="monthView" class="view active">
         <h2>Сентябрь 2026</h2>
         <div class="calendar-grid" id="calendarGrid"></div>
     </div>
 
-    <!-- ВЬЮ 2: 24 ЧАСА ДНЯ -->
     <div id="dayView" class="view">
         <button class="back-btn" id="backBtn">← Назад к месяцу</button>
         <h2 id="selectedDateTitle">День</h2>
@@ -173,14 +178,13 @@
             tg.disableVerticalSwipes();
         }
 
-        // Данные (в реальном проекте приходят с бэкенда Python)
         let appData = {
-            "2026-09-15": { note: "ТО", startHour: 10, durationHours: 2 },
-            "2026-09-18": { note: "Ремонт", startHour: 13, durationHours: 4 }
+            "2026-09-06": { note: "Ремонт", startHour: 13, durationHours: 4 },
+            "2026-09-15": { note: "ТО", startHour: 10, durationHours: 2 }
         };
 
         let currentSelectedDate = null;
-        const rowHeight = 44; // высота часа в пикселях с отступом
+        const rowHeight = 44;
 
         const calendarGrid = document.getElementById('calendarGrid');
         const monthView = document.getElementById('monthView');
@@ -189,7 +193,6 @@
         const selectedDateTitle = document.getElementById('selectedDateTitle');
         const backBtn = document.getElementById('backBtn');
 
-        // Рендер месяца (дни с 1 по 30)
         function renderMonth() {
             calendarGrid.innerHTML = '';
             for (let i = 1; i <= 30; i++) {
@@ -198,27 +201,84 @@
 
                 let cell = document.createElement('div');
                 cell.className = 'day-cell';
+                cell.dataset.date = dateKey;
                 
                 let dayNum = document.createElement('span');
                 dayNum.textContent = i;
                 cell.appendChild(dayNum);
 
                 if (appData[dateKey]) {
-                    let noteSpan = document.createElement('span');
-                    noteSpan.className = 'note';
-                    noteSpan.textContent = appData[dateKey].note;
-                    cell.appendChild(noteSpan);
+                    let eventCard = document.createElement('div');
+                    eventCard.className = 'month-event-card';
+                    eventCard.textContent = appData[dateKey].note;
+                    
+                    // Логика перетаскивания события между днями (как в пятнашках)
+                    initMonthDrag(eventCard, dateKey);
+                    
+                    cell.appendChild(eventCard);
                 }
 
-                cell.addEventListener('click', () => {
-                    openDayView(dateKey);
+                cell.addEventListener('click', (e) => {
+                    if (e.target === cell || e.target === dayNum) {
+                        openDayView(dateKey);
+                    }
                 });
 
                 calendarGrid.appendChild(cell);
             }
         }
 
-        // Открыть сетку 24 часа
+        function initMonthDrag(card, sourceDateKey) {
+            card.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                
+                let clone = card.cloneNode(true);
+                clone.style.position = 'fixed';
+                clone.style.zIndex = 1000;
+                clone.style.pointerEvents = 'none';
+                clone.style.width = `${card.offsetWidth}px`;
+                document.body.appendChild(clone);
+
+                function moveAt(pageX, pageY) {
+                    clone.style.left = `${pageX - clone.offsetWidth / 2}px`;
+                    clone.style.top = `${pageY - clone.offsetHeight / 2}px`;
+                }
+
+                moveAt(e.pageX, e.pageY);
+
+                function onPointerMove(e) {
+                    moveAt(e.pageX, e.pageY);
+                }
+
+                function onPointerUp(e) {
+                    window.removeEventListener('pointermove', onPointerMove);
+                    window.removeEventListener('pointerup', onPointerUp);
+                    clone.remove();
+
+                    // Ищем, над какой ячейкой дня отпустили карточку
+                    let elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                    let targetCell = elemBelow ? elemBelow.closest('.day-cell') : null;
+
+                    if (targetCell) {
+                        let targetDateKey = targetCell.dataset.date;
+                        if (targetDateKey && targetDateKey !== sourceDateKey) {
+                            // Переносим данные на новую дату
+                            appData[targetDateKey] = appData[sourceDateKey];
+                            delete appData[sourceDateKey];
+
+                            if (tg.HapticFeedback) {
+                                tg.HapticFeedback.impactOccurred('medium');
+                            }
+                            renderMonth();
+                        }
+                    }
+                }
+
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', onPointerUp);
+            });
+        }
+
         function openDayView(dateKey) {
             currentSelectedDate = dateKey;
             selectedDateTitle.textContent = `Дата: ${dateKey}`;
@@ -233,11 +293,9 @@
             renderMonth();
         });
 
-        // Рендер 24 часов и карточки с возможностью драг-н-дропа (растягивания)
         function renderHours() {
             hoursContainer.innerHTML = '';
             
-            // Строим шкалу времени
             for (let h = 0; h < 24; h++) {
                 let hourRow = document.createElement('div');
                 hourRow.className = 'hour-row';
@@ -248,7 +306,6 @@
 
                 let slot = document.createElement('div');
                 slot.className = 'hour-slot';
-                slot.dataset.hour = h;
 
                 hourRow.appendChild(label);
                 hourRow.appendChild(slot);
@@ -257,64 +314,60 @@
 
             let dayData = appData[currentSelectedDate];
             if (dayData) {
-                createBookingCard(dayData.startHour, dayData.durationHours, dayData.note);
-            } else {
-                // Если записи нет, создадим дефолтную по клику на ячейку или создадим пустую для теста
+                createDayResizeCard(dayData.startHour, dayData.durationHours, dayData.note);
             }
         }
 
-        function createBookingCard(startHour, duration, note) {
+        // Драг-н-ресайз внутри подробного дня (изменение длительности за нижний маркер)
+        function createDayResizeCard(startHour, duration, note) {
             let card = document.createElement('div');
             card.className = 'booking-card';
             card.style.top = `${startHour * rowHeight + 4}px`;
             card.style.height = `${duration * rowHeight - 6}px`;
-            card.innerHTML = `<span><b>${note}</b> (${duration} ч.)</span><div class="resize-handle" id="resizeHandle"></div>`;
+            card.innerHTML = `<span id="cardText"><b>${note}</b> (${startHour}:00, ${duration} ч.)</span><div class="resize-handle" id="resizeHandle"></div>`;
 
             hoursContainer.appendChild(card);
 
             let handle = card.querySelector('#resizeHandle');
-            let startY = 0;
-            let initialHeight = 0;
+            let cardText = card.querySelector('#cardText');
 
             handle.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
-                startY = e.clientY;
-                initialHeight = card.offsetHeight;
+                let startY = e.clientY;
+                let initialHeight = card.offsetHeight;
+                let currentStart = startHour;
+
+                function onPointerMove(e) {
+                    let deltaY = e.clientY - startY;
+                    let newHeight = initialHeight + deltaY;
+                    
+                    let minH = rowHeight - 6;
+                    let maxH = (24 - currentStart) * rowHeight;
+                    
+                    if (newHeight < minH) newHeight = minH;
+                    if (newHeight > maxH) newHeight = maxH;
+
+                    card.style.height = `${newHeight}px`;
+
+                    let currentDuration = Math.round(newHeight / rowHeight);
+                    cardText.innerHTML = `<b>${note}</b> (${currentStart}:00, ${currentDuration} ч.)`;
+                }
+
+                function onPointerUp() {
+                    window.removeEventListener('pointermove', onPointerMove);
+                    window.removeEventListener('pointerup', onPointerUp);
+
+                    let finalDuration = Math.round(card.offsetHeight / rowHeight);
+                    appData[currentSelectedDate].durationHours = finalDuration;
+                    
+                    if (tg.HapticFeedback) {
+                        tg.HapticFeedback.impactOccurred('medium');
+                    }
+                }
 
                 window.addEventListener('pointermove', onPointerMove);
                 window.addEventListener('pointerup', onPointerUp);
             });
-
-            function onPointerMove(e) {
-                let deltaY = e.clientY - startY;
-                let newHeight = initialHeight + deltaY;
-                
-                // Ограничения минимальной и максимальной длительности
-                let minH = rowHeight - 6;
-                let maxH = (24 - startHour) * rowHeight;
-                
-                if (newHeight < minH) newHeight = minH;
-                if (newHeight > maxH) newHeight = maxH;
-
-                card.style.height = `${newHeight}px`;
-
-                // Динамический расчет часов на лету
-                let currentDuration = Math.round(newHeight / rowHeight);
-                card.querySelector('span').innerHTML = `<b>${note}</b> (${currentDuration} ч.)`;
-            }
-
-            function onPointerUp(e) {
-                window.removeEventListener('pointermove', onPointerMove);
-                window.removeEventListener('pointerup', onPointerUp);
-
-                // Фиксация новой длительности в объекте и отправка на Python-сервер
-                let finalDuration = Math.round(card.offsetHeight / rowHeight);
-                appData[currentSelectedDate].durationHours = finalDuration;
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.impactOccurred('medium');
-                }
-            }
         }
 
         renderMonth();
