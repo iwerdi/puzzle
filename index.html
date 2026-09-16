@@ -13,7 +13,6 @@
             --button-color: var(--tg-theme-button-color, #2481cc);
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
             --card-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            --disabled-color: rgba(0, 0, 0, 0.05);
         }
 
         body {
@@ -61,7 +60,6 @@
         }
 
         .month-event-card {
-            background-color: var(--button-color);
             color: var(--button-text-color);
             font-size: 10px;
             padding: 2px 4px;
@@ -114,7 +112,6 @@
             position: absolute;
             left: 65px;
             right: 10px;
-            background-color: var(--button-color);
             color: var(--button-text-color);
             border-radius: 6px;
             padding: 6px 8px;
@@ -179,8 +176,9 @@
         }
 
         let appData = {
-            "2026-09-06": { note: "Ремонт", startHour: 13, durationHours: 4 },
-            "2026-09-15": { note: "ТО", startHour: 10, durationHours: 2 }
+            "2026-09-06": { note: "Ремонт", startHour: 13, durationHours: 4, color: "#e74c3c", originalDate: "2026-09-06" },
+            "2026-09-15": { note: "ТО", startHour: 10, durationHours: 2, color: "#2ecc71", originalDate: "2026-09-15" },
+            "2026-09-20": { note: "Диагностика", startHour: 15, durationHours: 1, color: "#f39c12", originalDate: "2026-09-20" }
         };
 
         let currentSelectedDate = null;
@@ -202,18 +200,25 @@
                 let cell = document.createElement('div');
                 cell.className = 'day-cell';
                 cell.dataset.date = dateKey;
-                cell.dataset.dayNum = i;
                 
                 let dayNum = document.createElement('span');
                 dayNum.textContent = i;
                 cell.appendChild(dayNum);
 
                 if (appData[dateKey]) {
+                    if (!appData[dateKey].originalDate) {
+                        appData[dateKey].originalDate = dateKey;
+                    }
+                    if (!appData[dateKey].color) {
+                        appData[dateKey].color = 'var(--button-color)';
+                    }
+
                     let eventCard = document.createElement('div');
                     eventCard.className = 'month-event-card';
+                    eventCard.style.backgroundColor = appData[dateKey].color;
                     eventCard.textContent = appData[dateKey].note;
                     
-                    initMonthDrag(eventCard, dateKey, i);
+                    initMonthDrag(eventCard, dateKey);
                     cell.appendChild(eventCard);
                 }
 
@@ -225,7 +230,7 @@
             }
         }
 
-        function initMonthDrag(card, sourceDateKey, sourceDayNum) {
+        function initMonthDrag(card, sourceDateKey) {
             let isDragging = false;
 
             card.addEventListener('pointerdown', (e) => {
@@ -267,19 +272,24 @@
 
                         if (targetCell) {
                             let targetDateKey = targetCell.dataset.date;
-                            let targetDayNum = parseInt(targetCell.dataset.dayNum);
+                            
+                            let eventData = appData[sourceDateKey];
+                            let originalDateKey = eventData ? eventData.originalDate : sourceDateKey;
 
-                            // Запрещаем переносить на ту же дату, а также на более ранние дни
-                            if (targetDateKey && targetDateKey !== sourceDateKey && targetDayNum >= sourceDayNum) {
-                                appData[targetDateKey] = appData[sourceDateKey];
-                                delete appData[sourceDateKey];
+                            let originalTime = new Date(originalDateKey).getTime();
+                            let targetTime = new Date(targetDateKey).getTime();
 
-                                if (tg.HapticFeedback) {
-                                    tg.HapticFeedback.impactOccurred('medium');
+                            if (targetDateKey && targetTime >= originalTime) {
+                                if (targetDateKey !== sourceDateKey) {
+                                    appData[targetDateKey] = eventData;
+                                    delete appData[sourceDateKey];
+
+                                    if (tg.HapticFeedback) {
+                                        tg.HapticFeedback.impactOccurred('medium');
+                                    }
+                                    renderMonth();
                                 }
-                                renderMonth();
-                            } else if (targetDayNum < sourceDayNum) {
-                                // Опциональная легкая вибрация при ошибке/невозможности переноса
+                            } else {
                                 if (tg.HapticFeedback) {
                                     tg.HapticFeedback.notificationOccurred('error');
                                 }
@@ -305,6 +315,7 @@
 
         backBtn.addEventListener('click', () => {
             dayView.classList.remove('active');
+            monthView.classList.active = true;
             monthView.classList.add('active');
             renderMonth();
         });
@@ -330,13 +341,14 @@
 
             let dayData = appData[currentSelectedDate];
             if (dayData) {
-                createDayResizeCard(dayData.startHour, dayData.durationHours, dayData.note);
+                createDayResizeCard(dayData.startHour, dayData.durationHours, dayData.note, dayData.color);
             }
         }
 
-        function createDayResizeCard(startHour, duration, note) {
+        function createDayResizeCard(startHour, duration, note, color) {
             let card = document.createElement('div');
             card.className = 'booking-card';
+            card.style.backgroundColor = color || 'var(--button-color)';
             card.style.top = `${startHour * rowHeight + 4}px`;
             card.style.height = `${duration * rowHeight - 6}px`;
             card.innerHTML = `<span id="cardText"><b>${note}</b> (${startHour}:00, ${duration} ч.)</span><div class="resize-handle" id="resizeHandle"></div>`;
